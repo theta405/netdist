@@ -43,16 +43,16 @@ def client(file_path):
         print(f"File transfer completed in {end_time - start_time} seconds")
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python script.py <client/server> <file_path>")
-        sys.exit(1)
+    # if len(sys.argv) != 3:
+    #     print("Usage: python script.py <client/server> <file_path>")
+    #     sys.exit(1)
 
     mode = sys.argv[1]
-    file_path = sys.argv[2]
 
     if mode == "server":
         server()
     elif mode == "client":
+        file_path = sys.argv[2]
         client(file_path)
     else:
         print("Invalid mode. Use 'client' or 'server'")
