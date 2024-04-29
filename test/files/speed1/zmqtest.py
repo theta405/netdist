@@ -15,9 +15,6 @@ def server():
         # Receive and unpack data
         data = msgpack.unpackb(message)
 
-        # Simulate processing time
-        time.sleep(1)
-
         # Acknowledge receipt
         socket.send(b"Received")
 
@@ -27,7 +24,7 @@ def server():
 def client(file_path):
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://localhost:5555")
+    socket.connect("tcp://mini.lan:5555")
 
     with open(file_path, "rb") as file:
         data = file.read()
