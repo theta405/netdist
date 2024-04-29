@@ -5,7 +5,7 @@ import os
 
 def server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(("127.0.0.1", 5555))
+    server_socket.bind(("0.0.0.0", 5555))
     server_socket.listen(1)
     print("Server is listening...")
 
@@ -31,12 +31,12 @@ def server():
             end_time = time.time()
             print(f"Received file in {end_time - start_time} seconds")
 
-            with open("received_file", "wb") as file:
-                file.write(received_data)
+            # with open("received_file", "wb") as file:
+            #     file.write(received_data)
 
 def client(file_path):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(("127.0.0.1", 5555))
+    client_socket.connect(("mini.lan", 5555))
 
     file_size = os.path.getsize(file_path)
     client_socket.sendall(file_size.to_bytes(4, "big"))
