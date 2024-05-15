@@ -15,6 +15,10 @@ def receive_full_data(sock, size):
         data.extend(packet)
     return data
 
+def send_ack(sock, order):
+    ack = STRUCT.pack(order)
+    sock.sendall(ack)
+
 def receive_packet(sock):
     size_data = sock.recv(STRUCT.size)
     if not size_data:
@@ -26,7 +30,6 @@ def receive_packet(sock):
 def file_generator(f):
     while True:
         packet = yield
-        print(packet["operation"])
         if packet['operation'] == 'stop':
             f.close()
         else:
@@ -48,30 +51,35 @@ def object_generator():
             obj_chunks.append(chunk_data)
 
 def handle_client(conn):
-    packet = receive_packet(conn)
-    if not packet:
-        return
-    operation = packet["operation"]
-    if operation == "file":
-        file_name = packet['message']['file_name']
-        path = pathlib.Path(file_name)
-        file = open(path, "wb")
-        generator = file_generator(file)
-    elif operation == "object":
-        generator = object_generator()
-
-    next(generator)
-    generator.send(packet)
-    
-    while True:
+    try:
         packet = receive_packet(conn)
         if not packet:
-            break
-
-        generator.send(packet)
+            return
         operation = packet["operation"]
-        if operation == "stop":
-            break
+        if operation == "file":
+            file_name = packet['message']['file_name']
+            path = pathlib.Path(file_name)
+            file = open(path, "wb")
+            generator = file_generator(file)
+        elif operation == "object":
+            generator = object_generator()
+
+        next(generator)
+        generator.send(packet)
+        send_ack(conn, packet['order'])
+        
+        while True:
+            packet = receive_packet(conn)
+            if not packet:
+                break
+
+            generator.send(packet)
+            send_ack(conn, packet['order'])
+            operation = packet["operation"]
+            if operation == "stop":
+                break
+    except Exception as e:
+        print(f"An error occurred while handling client: {e}")
 
 def start_server(host='127.0.0.1', port=65432):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
