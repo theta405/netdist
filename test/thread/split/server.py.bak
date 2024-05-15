@@ -1,0 +1,83 @@
+import socket
+import pickle
+from struct import Struct
+import pathlib
+
+CHUNK_SIZE = 1024
+STRUCT = Struct("!I")
+
+def receive_packet(sock):
+    size_data = sock.recv(STRUCT.size)
+    if not size_data:
+        return None
+    size = STRUCT.unpack(size_data)[0]
+    data = sock.recv(size)
+    return pickle.loads(data)
+
+def file_generator():
+    file_chunks = {}
+    while True:
+        packet = yield
+        if packet['operation'] == 'stop':
+            file_name = packet['message']['file_name']
+            path = pathlib.Path(file_name)
+            with path.open('wb') as f:
+                for order in sorted(file_chunks):
+                    f.write(file_chunks[order])
+            print(f"File {file_name} saved.")
+            file_chunks.clear()
+        else:
+            order = packet['order']
+            chunk_data = packet['data']
+            file_chunks[order] = chunk_data
+
+def object_generator():
+    obj_chunks = {}
+    while True:
+        packet = yield
+        if packet['operation'] == 'stop':
+            serialized_obj = b''.join(obj_chunks[order] for order in sorted(obj_chunks))
+            obj = pickle.loads(serialized_obj)
+            print("Received object:", obj)
+            obj_chunks.clear()
+        else:
+            order = packet['order']
+            chunk_data = packet['data']
+            obj_chunks[order] = chunk_data
+
+def handle_client(conn):
+    file_gen = file_generator()
+    obj_gen = object_generator()
+    next(file_gen)
+    next(obj_gen)
+    
+    while True:
+        packet = receive_packet(conn)
+        if not packet:
+            break
+
+        operation = packet["operation"]
+        if operation == "file":
+            file_gen.send(packet)
+        elif operation == "object":
+            obj_gen.send(packet)
+        elif operation == "stop":
+            if "file_name" in packet["message"]:
+                file_gen.send(packet)
+            else:
+                obj_gen.send(packet)
+            break
+
+def start_server(host='127.0.0.1', port=65432):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, port))
+        s.listen()
+        print("Server started and listening on", host, port)
+        while True:
+            conn, addr = s.accept()
+            with conn:
+                print("Connected by", addr)
+                handle_client(conn)
+
+if __name__ == "__main__":
+    start_server()

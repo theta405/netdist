@@ -73,7 +73,7 @@ def main():
     port = 65432        # 服务器端口
 
     # 示例：发送文件
-    send_file('example.txt', host, port)
+    # send_file('example.txt', host, port)
 
     # 示例：发送Python对象
     data = {"key1": "value1", "key2": [1, 2, 3], "key3": {"nested_key": "nested_value"}}

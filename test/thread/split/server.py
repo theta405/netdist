@@ -6,60 +6,72 @@ import pathlib
 CHUNK_SIZE = 1024
 STRUCT = Struct("!I")
 
+def receive_full_data(sock, size):
+    data = bytearray()
+    while len(data) < size:
+        packet = sock.recv(size - len(data))
+        if not packet:
+            raise ConnectionError("Socket connection broken")
+        data.extend(packet)
+    return data
+
 def receive_packet(sock):
     size_data = sock.recv(STRUCT.size)
     if not size_data:
         return None
     size = STRUCT.unpack(size_data)[0]
-    data = sock.recv(size)
+    data = receive_full_data(sock, size)
     return pickle.loads(data)
 
+def file_generator(f):
+    while True:
+        packet = yield
+        print(packet["operation"])
+        if packet['operation'] == 'stop':
+            f.close()
+        else:
+            chunk_data = packet['data']
+            f.write(chunk_data)
+            f.flush()
+
+def object_generator():
+    obj_chunks = []
+    while True:
+        packet = yield
+        if packet['operation'] == 'stop':
+            serialized_obj = b''.join(obj_chunks)
+            obj = pickle.loads(serialized_obj)
+            print("Received object:", obj)
+            obj_chunks.clear()
+        else:
+            chunk_data = packet['data']
+            obj_chunks.append(chunk_data)
+
 def handle_client(conn):
-    file_buffers = {}
-    obj_buffers = {}
+    packet = receive_packet(conn)
+    if not packet:
+        return
+    operation = packet["operation"]
+    if operation == "file":
+        file_name = packet['message']['file_name']
+        path = pathlib.Path(file_name)
+        file = open(path, "wb")
+        generator = file_generator(file)
+    elif operation == "object":
+        generator = object_generator()
+
+    next(generator)
+    generator.send(packet)
     
     while True:
         packet = receive_packet(conn)
         if not packet:
             break
 
+        generator.send(packet)
         operation = packet["operation"]
-        order = packet["order"]
-        chunk_data = packet["data"]
-        message = packet["message"]
-
-        if operation == "file":
-            file_name = message["file_name"]
-            if file_name not in file_buffers:
-                file_buffers[file_name] = {}
-            file_buffers[file_name][order] = chunk_data
-        elif operation == "object":
-            if "object" not in obj_buffers:
-                obj_buffers["object"] = {}
-            obj_buffers["object"][order] = chunk_data
-        elif operation == "stop":
-            if "file_name" in message:
-                file_name = message["file_name"]
-                if file_name in file_buffers:
-                    save_file(file_name, file_buffers[file_name])
-                    del file_buffers[file_name]
-            else:
-                if "object" in obj_buffers:
-                    obj_data = assemble_object(obj_buffers["object"])
-                    print("Received object:", obj_data)
-                    del obj_buffers["object"]
+        if operation == "stop":
             break
-
-def save_file(file_name, file_chunks):
-    path = pathlib.Path(file_name)
-    with path.open('wb') as f:
-        for order in sorted(file_chunks):
-            f.write(file_chunks[order])
-    print(f"File {file_name} saved.")
-
-def assemble_object(chunks):
-    serialized_obj = b''.join(chunks[order] for order in sorted(chunks))
-    return pickle.loads(serialized_obj)
 
 def start_server(host='127.0.0.1', port=65432):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
