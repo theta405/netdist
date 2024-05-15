@@ -5,6 +5,7 @@ import pathlib
 
 CHUNK_SIZE = 1024
 STRUCT = Struct("!I")
+WINDOW_SIZE = 50  # 窗口大小
 
 def receive_full_data(sock, size):
     data = bytearray()
@@ -15,10 +16,6 @@ def receive_full_data(sock, size):
         data.extend(packet)
     return data
 
-def send_ack(sock, order):
-    ack = STRUCT.pack(order)
-    sock.sendall(ack)
-
 def receive_packet(sock):
     size_data = sock.recv(STRUCT.size)
     if not size_data:
@@ -26,6 +23,10 @@ def receive_packet(sock):
     size = STRUCT.unpack(size_data)[0]
     data = receive_full_data(sock, size)
     return pickle.loads(data)
+
+def send_ack(sock, order):
+    ack = STRUCT.pack(order)
+    sock.sendall(ack)
 
 def file_generator(f):
     while True:
@@ -81,7 +82,7 @@ def handle_client(conn):
     except Exception as e:
         print(f"An error occurred while handling client: {e}")
 
-def start_server(host='127.0.0.1', port=65432):
+def start_server(host='0.0.0.0', port=65432):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
         s.listen()
