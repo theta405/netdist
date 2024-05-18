@@ -8,6 +8,7 @@ REMOTE_HOST = "0.0.0.0"
 REMOTE_PORT = 65432
 STRUCT = Struct("!I")
 TIMEOUT = 5
+WINDOW_SIZE = 50  # 窗口大小
 
 app = Flask(__name__)
 

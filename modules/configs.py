@@ -1,5 +1,6 @@
 from utils.custom_dict import CustomDict
 from utils.thread_lock import ThreadLock
+from .file_processor import File
 
 
 class Config(CustomDict, ThreadLock):  # 模块配置
@@ -7,7 +8,7 @@ class Config(CustomDict, ThreadLock):  # 模块配置
         ThreadLock.__init__(self)  # 调用 ThreadLock 的初始化方法，注意 self 不能去掉
         self.__mandatory_keys = conf.keys()  # 判断配置项是否一致
         self.__config_name = config_name
-        self.__file = File("configs", self.__config_name)
+        self.__file = File(f"%configs%/{self.__config_name}.json", stream=False)
 
         if self.__file.exists:  # 如果已有配置，则读取
             self.read()
@@ -36,3 +37,26 @@ class Config(CustomDict, ThreadLock):  # 模块配置
     def save(self):  # 保存配置
         save_data = {k: v for k, v in self.items() if not k.startswith("_")}
         self.__file.save(save_data)
+
+
+general = Config(
+    "general",
+    initialized = False,
+    node_role = "",
+    workdir = "",
+)
+
+master = Config(
+    "master",
+    flask_port = 15000,
+    socket_port = 16000,
+    shared_files = {},
+    user_password = "",
+    nodes = {},
+)
+
+slave = Config(
+    "slave",
+    master_ip = "",
+    master_port = 0
+)

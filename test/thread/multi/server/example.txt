@@ -1,3 +1,4 @@
+wocaonima很好，请结合上述代码和需求，完善服务器的功能：
 import socket
 import pickle
 from struct import Struct
@@ -94,3 +95,5 @@ def start_server(host='0.0.0.0', port=65432):
 
 if __name__ == "__main__":
     start_server()
+
+主要添加向客户端返回数据的功能，传输方式与客户端完全相同（使用滑动窗口的确认机制），文件用file作为operation键；数据结构用object作为operation键。但不需要使用线程，因为服务器只会有一个客户端线程与之通信。返回的文件数据暂时用本地目录的example.txt替代，返回的数据结构暂时用{"result": "ok"}替代。

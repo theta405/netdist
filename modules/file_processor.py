@@ -1,62 +1,53 @@
-from json import dump, load, dumps
 from pathlib import Path
-from .thread_manager import ThreadLock
+from re import match
+
+config_rootpath = Path("/tmp")
 
 
-class Folder(ThreadLock):
-    def __init__(self, name):
-        try:
-            from main import ROOT  # 避免循环导入
-        except ImportError:
-            ROOT = Path(__file__).parent.parent  # 导入不了就默认用上级目录
-        super().__init__()
-        self.folder = ROOT / name
+REMOTE_PATTERN = r'^[^:]+:'
+SPECIAL_PATTERN = r"^(%[^%]+%)"
+
+LOCAL = 0
+REMOTE = 1
+SPECIAL = 2
+
+
+class Folder():
+    def __init__(self, folder_path):
+        self.folder = folder_path
         self.folder.mkdir(parents=True, exist_ok=True)  # 目录不存在则创建
 
     def glob(self, pattern):
         return self.folder.glob(pattern)
 
 
-class File(Folder):
-    def __init__(self, folder, name, indented=True, incremental=False, type_=None, **args):
-        super().__init__(folder)
-        self.__args = args
-        if type_ is None:
-            type_ = f"json{'l' if incremental else ''}"
-        self.file_name = f"{name}.{type_}"
-        self.file = self.folder / self.file_name
-        self.__incremental = incremental
-        self.__indented = indented
+class File():
+    def __init__(self, file_path, stream=True):
+        self.__virtual_path = file_path
+        self.__type = self.__pathtype(self.__virtual_path)
+        self.__stream = stream
 
-    @property
-    def exists(self):  # 是否存在
-        return self.file.exists()
-    
-    @property
-    def lines(self):  # 统计行数
-        lines = 0
-        with open(self.file, "r", encoding="utf-8", **self.__args) as file:
-            for _ in file:
-                lines += 1
-        return lines
+        if self.__type == LOCAL:
+            from .configs import general
+            self.__relative_path = self.__virtual_path
+            self.__real_path = Path(general.workdir) / Path(self.__relative_path)
+        elif self.__type == REMOTE:
+            self.__node_id = None
+            self.__relative_path = None
+        elif self.__type == SPECIAL:
+            self.__relative_path = Path(__file__).parent
+            self.__real_path = None
 
-    def load(self):  # 加载文件
-        with open(self.file, "r", encoding="utf-8", **self.__args) as file:
-            return load(file)
+    def __pathtype(self, virtual_path):
+        if virtual_path[0] == "/":
+            return LOCAL
+        elif match(REMOTE_PATTERN, virtual_path):
+            return REMOTE
+        elif match(SPECIAL_PATTERN, virtual_path):
+            return SPECIAL
 
-    def save(self, data):  # 保存文件
-        if self.__incremental:  # 对全量和增量分别处理
-            with open(self.file, "a", encoding="utf-8", **self.__args) as file:
-                for item in data:
-                    file.write(dumps(item, ensure_ascii=False) + "\n")
-        else:
-            with open(self.file, "w+", encoding="utf-8", **self.__args) as file:
-                dump(data, file, ensure_ascii=False, indent=4 if self.__indented else None)
+    def virtual_to_real(self, virtual_path):
+        pass
 
-    def read(self):  # 读取文件
-        with open(self.file, "r", encoding="utf-8", **self.__args) as file:
-            return file.read()
-
-    def write(self, data):  # 写入文件
-        with open(self.file, "w+", encoding="utf-8", **self.__args) as file:
-            file.write(data)
+if __name__ == "__main__":
+    test = File("/vdseaar1:/test/path")
